@@ -4,9 +4,28 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useFleetStore } from '../store/useFleetStore';
 
 const STREET_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
-// Mapbox Satellite (your pk.eyJ... key is Mapbox; use Mapbox style URL)
-const SATELLITE_STYLE =
-  'https://api.mapbox.com/styles/v1/mapbox/satellite-v9?access_token=REDACTED';
+
+// Free satellite imagery (no API key). Mapbox satellite can be used instead if you have a valid token.
+const SATELLITE_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  sources: {
+    'esri-satellite': {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      attribution: '&copy; <a href="https://www.esri.com/">Esri</a>',
+    },
+  },
+  layers: [
+    {
+      id: 'esri-satellite-layer',
+      type: 'raster',
+      source: 'esri-satellite',
+    },
+  ],
+};
 
 const MOWBOT_ARROW_SVG =
   '<svg width="30" height="30" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 5 L90 90 L50 70 L10 90 L50 5 Z" fill="#00ff88" stroke="#ffffff" stroke-width="2"/></svg>';
@@ -53,7 +72,7 @@ const MapComponent: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const { fleet, setSelectedAgv } = useFleetStore();
-  const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
+  const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('satellite');
 
   // 1. Initialize Map (after layout so container has dimensions)
   useEffect(() => {
@@ -64,7 +83,7 @@ const MapComponent: React.FC = () => {
       if (map.current || !container?.parentElement) return;
       map.current = new maplibregl.Map({
         container,
-        style: STREET_STYLE,
+        style: SATELLITE_STYLE,
         center: [128.39, 36.14],
         zoom: 15,
       });
