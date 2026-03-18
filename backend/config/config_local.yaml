@@ -1,0 +1,27 @@
+# General Application Settings
+general:
+  manufacturer: "mowbot"      # Default manufacturer for VDA5050 topics
+  serial_number: "default"    # Default serial if not specified
+  language: "en"              # Initial UI language (en/ko)
+  
+  # Map Configuration for the Frontend
+  map:
+    style: "default"          # "default" (Carto Light) or "satellite"
+    mapbox_api_key: ""        # Required for satellite view
+    default_zoom: 15          # Initial zoom level
+    heading_offset: 0.0       # Correction for projection distortion
+
+# MQTT Broker Settings
+# Note: In production, these are often overridden by encrypted DB or Env Vars
+broker:
+  host: "bd1c42d0ad95443bbfee39d5e63806bc.s1.eu.hivemq.cloud"
+  port: 8883
+  use_tls: true
+  user: "mowbot-fleet-01"
+  password: "Serene1054"
+
+# Mission and VDA5050 Logic Constraints
+mission:
+  default_order_prefix: "ORDER" # Prefix for auto-generated IDs
+  max_nodes: 50                 # Maximum waypoints per mission
+  min_node_distance: 0.0        # Minimum distance between waypoints (0.0 to disable)

@@ -1,1 +1,4 @@
 /temp
+
+*.pyc
+__pycache__
