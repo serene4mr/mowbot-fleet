@@ -4,7 +4,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { WS_FLEET_URL } from './config';
 import MapComponent from './components/MapComponent';
 import Sidebar from './components/Sidebar';
-import FleetPage from './components/FleetPage';
+import FleetDetailPanel from './components/FleetDetailPanel';
 import SettingsPage from './components/SettingsPage';
 import MissionsPage from './components/MissionsPage';
 import LoginPage from './components/LoginPage';
@@ -45,8 +45,22 @@ function App() {
         </header>
 
         <div className="flex-1 relative min-h-0">
-          {activePage === 'map' && <MapComponent />}
-          {activePage === 'fleet' && <FleetPage />}
+          {activePage === 'map' && (
+            <div className="h-full w-full flex overflow-hidden">
+              <aside className="w-80 bg-[#1a1c23] border-r border-gray-800 flex flex-col overflow-hidden shrink-0">
+                <div className="border-b border-gray-800 px-4 py-3 shrink-0">
+                  <div className="text-xs tracking-widest uppercase text-gray-500 font-semibold">Fleet</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">Robot details &amp; commands</div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <FleetDetailPanel />
+                </div>
+              </aside>
+              <div className="flex-1 min-w-0 relative">
+                <MapComponent />
+              </div>
+            </div>
+          )}
           {activePage === 'missions' && <MissionsPage />}
           {activePage === 'settings' && <SettingsPage />}
         </div>

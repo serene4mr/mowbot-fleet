@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { FleetDict } from '../types/fleet';
 
-export type AppPage = 'fleet' | 'map' | 'missions' | 'settings';
+export type AppPage = 'map' | 'missions' | 'settings';
 
 interface FleetState {
   fleet: FleetDict;

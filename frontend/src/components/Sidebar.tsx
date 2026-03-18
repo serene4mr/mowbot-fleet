@@ -1,4 +1,4 @@
-import { Cpu, Map, Route, Settings } from 'lucide-react';
+import { Map, Route, Settings } from 'lucide-react';
 import { useFleetStore } from '../store/useFleetStore';
 
 export default function Sidebar() {
@@ -6,7 +6,6 @@ export default function Sidebar() {
     useFleetStore();
 
   const nav = [
-    { id: 'fleet' as const, label: 'Fleet', icon: Cpu },
     { id: 'map' as const, label: 'Map', icon: Map },
     { id: 'missions' as const, label: 'Missions', icon: Route },
     { id: 'settings' as const, label: 'Settings', icon: Settings },
@@ -28,7 +27,7 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <div className="px-4 pb-4 grid grid-cols-4 gap-2">
+        <div className="px-4 pb-4 grid grid-cols-3 gap-2">
           {nav.map((item) => {
             const Icon = item.icon;
             const isActive = activePage === item.id;
