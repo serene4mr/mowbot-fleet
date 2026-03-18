@@ -39,7 +39,6 @@ export default function MissionsPage() {
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
 
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [routes, setRoutes] = useState<MissionRoute[]>([]);

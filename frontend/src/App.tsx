@@ -1,6 +1,7 @@
 import { useFleetStore } from './store/useFleetStore';
 import { useAuthStore } from './store/useAuthStore';
 import { useWebSocket } from './hooks/useWebSocket';
+import { WS_FLEET_URL } from './config';
 import MapComponent from './components/MapComponent';
 import Sidebar from './components/Sidebar';
 import FleetPage from './components/FleetPage';
@@ -12,30 +13,34 @@ function App() {
   const token = useAuthStore((s) => s.token);
   const { isConnected, activePage } = useFleetStore();
 
-  useWebSocket('ws://localhost:8000/ws/fleet');
+  useWebSocket(WS_FLEET_URL);
 
   if (!token) {
     return <LoginPage />;
   }
 
   return (
-    <div className="flex h-screen w-screen bg-[#0e1117] text-white overflow-hidden">
+    <div className="flex h-screen w-screen text-white overflow-hidden">
       <Sidebar />
 
       <main className="flex-1 relative flex flex-col min-w-0">
-        <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#1a1c23]">
-          <h1 className="text-xl font-black tracking-tight text-[#00ff88]">
-            MOWBOT<span className="text-white">FLEET</span>
+        <header className="h-16 flex items-center justify-between px-6 bg-black/20 backdrop-blur-md border-b border-white/10">
+          <h1 className="text-xl font-black tracking-tight text-[#00ff88] select-none">
+            MOWBOT<span className="text-white/90">FLEET</span>
           </h1>
           <div
-            className={`flex items-center gap-2 text-[10px] font-mono ${isConnected ? 'text-green-400' : 'text-red-400'}`}
+            className={`flex items-center gap-2 text-[10px] font-mono tracking-widest ${
+              isConnected ? 'text-green-300' : 'text-red-300'
+            }`}
             title={isConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
           >
             <span
-              className={`w-2 h-2 rounded-full animate-pulse block ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}
+              className={`w-2 h-2 rounded-full animate-pulse block ${
+                isConnected ? 'bg-green-300' : 'bg-red-300'
+              }`}
               aria-hidden
             />
-            <span>{isConnected ? 'LIVE STREAMING' : 'DISCONNECTED'}</span>
+            <span>{isConnected ? 'LIVE' : 'OFFLINE'}</span>
           </div>
         </header>
 
