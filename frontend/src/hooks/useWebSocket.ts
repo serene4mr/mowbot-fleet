@@ -3,8 +3,9 @@ import { useEffect, useRef } from 'react';
 import { useFleetStore } from '../store/useFleetStore';
 
 export const useWebSocket = (url: string) => {
-  const { updateFleet, setConnected, setSelectedAgv, selectedAgv } = useFleetStore();
+  const { updateFleet, setConnected, setSelectedAgv } = useFleetStore();
   const socketRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const connect = () => {
@@ -21,11 +22,6 @@ export const useWebSocket = (url: string) => {
         try {
           const data = JSON.parse(event.data);
           updateFleet(data);
-
-          // Auto-select the first AGV if nothing is selected yet
-          if (!selectedAgv && Object.keys(data).length > 0) {
-            setSelectedAgv(Object.keys(data)[0]);
-          }
         } catch (err) {
           console.error('❌ Failed to parse WebSocket message:', err);
         }
@@ -34,7 +30,8 @@ export const useWebSocket = (url: string) => {
       socket.onclose = () => {
         console.warn('⚠️ WebSocket Disconnected. Retrying in 3s...');
         setConnected(false);
-        setTimeout(connect, 3000); // Auto-reconnect logic
+        if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = window.setTimeout(connect, 3000); // Auto-reconnect logic
       };
 
       socket.onerror = (error) => {
@@ -47,9 +44,10 @@ export const useWebSocket = (url: string) => {
 
     // Cleanup when the component unmounts
     return () => {
+      if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
       if (socketRef.current) {
         socketRef.current.close();
       }
     };
-  }, [url, updateFleet, setConnected, setSelectedAgv, selectedAgv]);
+  }, [url, updateFleet, setConnected, setSelectedAgv]);
 };

@@ -29,6 +29,18 @@ const SATELLITE_STYLE: maplibregl.StyleSpecification = {
 const MOWBOT_ARROW_SVG =
   '<svg width="30" height="30" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 5 L90 90 L50 70 L10 90 L50 5 Z" fill="#00ff88" stroke="#ffffff" stroke-width="2"/></svg>';
 
+const MOWBOT_ARROW_SELECTED_SVG =
+  '<svg width="34" height="34" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
+  '<defs>' +
+  '<filter id="glow" x="-50%" y="-50%" width="200%" height="200%">' +
+  '<feGaussianBlur stdDeviation="3" result="blur"/>' +
+  '<feColorMatrix in="blur" type="matrix" values="0 0 0 0 0  0 0 0 0 1  0 0 0 0 0.53  0 0 0 0.75 0" result="colored"/>' +
+  '<feMerge><feMergeNode in="colored"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+  '</filter>' +
+  '</defs>' +
+  '<path d="M50 5 L90 90 L50 70 L10 90 L50 5 Z" fill="#00ff88" stroke="rgba(255,255,255,0.95)" stroke-width="7" filter="url(#glow)"/>' +
+  '</svg>';
+
 // Heading conventions vary by robot stack:
 // - MapLibre expects degrees where 0° points "north/up" and positive rotates clockwise.
 // - Some robotics stacks also use clockwise-positive; others use CCW-positive.
@@ -39,11 +51,35 @@ function addFleetToMap(map: maplibregl.Map | null, onSelectAgv: (serial: string)
   if (!map?.getSource('fleet-source')) return;
 
   const img = new Image(30, 30);
-  img.onload = () => {
+  const imgSelected = new Image(34, 34);
+  let loaded = 0;
+  const maybeInit = () => {
+    loaded += 1;
+    if (loaded < 2) return;
+
     if (!map.hasImage('mowbot-arrow')) {
       map.addImage('mowbot-arrow', img);
     }
+    if (!map.hasImage('mowbot-arrow-selected')) {
+      map.addImage('mowbot-arrow-selected', imgSelected);
+    }
     if (map.getLayer('fleet-layer')) return;
+
+    // Selected robot highlight ring (under the icon)
+    map.addLayer({
+      id: 'fleet-selected-ring',
+      type: 'circle',
+      source: 'fleet-source',
+      // Start with no match; MapComponent will setFilter based on selectedAgv
+      filter: ['==', ['get', 'serial'], '__none__'],
+      paint: {
+        'circle-radius': 24,
+        'circle-color': 'rgba(0, 255, 136, 0.14)',
+        'circle-stroke-width': 3,
+        'circle-stroke-color': 'rgba(0, 255, 136, 0.95)',
+        'circle-blur': 1.05,
+      },
+    });
 
     map.addLayer({
       id: 'fleet-layer',
@@ -53,13 +89,33 @@ function addFleetToMap(map: maplibregl.Map | null, onSelectAgv: (serial: string)
         'icon-image': 'mowbot-arrow',
         'icon-rotate': ['get', 'theta'],
         'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
         'text-field': ['get', 'serial'],
         'text-offset': [0, 1.5],
         'text-anchor': 'top',
+        'text-allow-overlap': true,
+        'text-ignore-placement': true,
         'icon-size': 1.5,
       },
       paint: {
         'text-color': '#00ff88',
+      },
+    });
+
+    // Selected robot overlay icon (stronger edge + glow)
+    map.addLayer({
+      id: 'fleet-selected-icon',
+      type: 'symbol',
+      source: 'fleet-source',
+      filter: ['==', ['get', 'serial'], '__none__'],
+      layout: {
+        'icon-image': 'mowbot-arrow-selected',
+        'icon-rotate': ['get', 'theta'],
+        'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+        'icon-size': 1.65,
       },
     });
 
@@ -132,13 +188,16 @@ function addFleetToMap(map: maplibregl.Map | null, onSelectAgv: (serial: string)
         .addTo(map);
     });
   };
+  img.onload = maybeInit;
+  imgSelected.onload = maybeInit;
   img.src = 'data:image/svg+xml;base64,' + btoa(MOWBOT_ARROW_SVG);
+  imgSelected.src = 'data:image/svg+xml;base64,' + btoa(MOWBOT_ARROW_SELECTED_SVG);
 }
 
 const MapComponent: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const { fleet, focusRequest, requestFocusAgv } = useFleetStore();
+  const { fleet, selectedAgv, focusRequest, requestFocusAgv } = useFleetStore();
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('satellite');
   const hasAutoFit = useRef(false);
   const fleetRef = useRef(fleet);
@@ -245,6 +304,17 @@ const MapComponent: React.FC = () => {
       essential: true,
     });
   }, [focusRequest]);
+
+  // 2.7 Highlight selected robot marker (ring under icon)
+  useEffect(() => {
+    if (!map.current) return;
+    if (!map.current.getLayer('fleet-selected-ring')) return;
+    const serial = selectedAgv ?? '__none__';
+    map.current.setFilter('fleet-selected-ring', ['==', ['get', 'serial'], serial]);
+    if (map.current.getLayer('fleet-selected-icon')) {
+      map.current.setFilter('fleet-selected-icon', ['==', ['get', 'serial'], serial]);
+    }
+  }, [selectedAgv]);
 
   // 3. Update AGV positions in real time
   useEffect(() => {
