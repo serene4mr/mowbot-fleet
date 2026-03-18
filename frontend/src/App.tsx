@@ -47,13 +47,16 @@ function App() {
         <div className="flex-1 relative min-h-0">
           {activePage === 'map' && (
             <div className="h-full w-full flex overflow-hidden">
-              <aside className="w-80 bg-[#1a1c23] border-r border-gray-800 flex flex-col overflow-hidden shrink-0">
-                <div className="border-b border-gray-800 px-4 py-3 shrink-0">
-                  <div className="text-xs tracking-widest uppercase text-gray-500 font-semibold">Fleet</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">Robot details &amp; commands</div>
+              <aside className="w-96 bg-[#1a1c23] border-r border-gray-800 flex flex-col overflow-hidden shrink-0">
+                <div className="border-b border-gray-800 px-10 py-4 shrink-0">
+                  <div className="text-sm tracking-widest uppercase text-gray-400 font-semibold">
+                    Robot details &amp; commands
+                  </div>
                 </div>
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  <FleetDetailPanel />
+                <div className="flex-1 min-h-0 overflow-y-auto px-10 py-6">
+                  <div className="mx-auto w-full max-w-[18rem]">
+                    <FleetDetailPanel />
+                  </div>
                 </div>
               </aside>
               <div className="flex-1 min-w-0 relative">
