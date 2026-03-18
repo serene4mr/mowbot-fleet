@@ -2,3 +2,10 @@
 
 *.pyc
 __pycache__
+
+# Runtime data (SQLite DBs, encryption key, etc.)
+data/
+backend/data/
+
+# Local-only config (may contain secrets)
+config/config_local.yaml
