@@ -26,22 +26,62 @@ async def lifespan(app: FastAPI):
     init_all()
     ensure_default_admin()
 
-    # Determine broker config: secure DB → YAML config → environment variables
+    # Determine broker config: env overrides; then stored DB; then YAML. If stored is default (localhost), prefer YAML so config_local.yaml is used.
     stored = get_broker_config()
     yaml_cfg = load_config().get("broker", {})
 
-    host = os.getenv("BROKER_HOST", stored.get("host") or yaml_cfg.get("host", "localhost"))
-    port = int(os.getenv("BROKER_PORT", stored.get("port") or yaml_cfg.get("port", 1883)))
-    user = os.getenv("BROKER_USER", stored.get("user") or yaml_cfg.get("user", ""))
-    password = os.getenv("BROKER_PASSWORD", stored.get("password") or yaml_cfg.get("password", ""))
+    def is_default_stored(s):
+        h = (s.get("host") or "").strip().lower()
+        p = s.get("port") in (None, 1883)
+        return (h in ("", "localhost") and p) or not h
+
+    if os.getenv("BROKER_HOST") is not None:
+        host = os.getenv("BROKER_HOST")
+    elif is_default_stored(stored) and yaml_cfg.get("host"):
+        host = yaml_cfg.get("host", "localhost")
+    else:
+        host = stored.get("host") or yaml_cfg.get("host", "localhost")
+
+    if os.getenv("BROKER_PORT") is not None:
+        port = int(os.getenv("BROKER_PORT"))
+    elif is_default_stored(stored) and yaml_cfg.get("port") is not None:
+        port = int(yaml_cfg.get("port", 1883))
+    else:
+        port = int(stored.get("port") or yaml_cfg.get("port", 1883))
+
+    if os.getenv("BROKER_USER") is not None:
+        user = os.getenv("BROKER_USER")
+    elif is_default_stored(stored):
+        user = yaml_cfg.get("user", "")
+    else:
+        user = stored.get("user") or yaml_cfg.get("user", "")
+
+    if os.getenv("BROKER_PASSWORD") is not None:
+        password = os.getenv("BROKER_PASSWORD")
+    elif is_default_stored(stored):
+        password = yaml_cfg.get("password", "")
+    else:
+        password = stored.get("password") or yaml_cfg.get("password", "")
+
     use_tls_env = os.getenv("BROKER_TLS")
     if use_tls_env is not None:
         use_tls = use_tls_env.lower() == "true"
+    elif is_default_stored(stored):
+        use_tls = yaml_cfg.get("use_tls", False)
     else:
         use_tls = stored.get("use_tls") or yaml_cfg.get("use_tls", False)
 
     logger.info(f"Starting backend — connecting to MQTT at {host}:{port}")
     await mqtt_service.connect(host=host, port=port, user=user, password=password, use_tls=use_tls)
+
+    if not mqtt_service.is_connected() and yaml_cfg.get("host") and (stored.get("host") or "").lower() == "localhost":
+        logger.warning("MQTT connect with stored config failed; retrying with YAML broker config...")
+        host = yaml_cfg.get("host", host)
+        port = int(yaml_cfg.get("port", port))
+        user = yaml_cfg.get("user", user)
+        password = yaml_cfg.get("password", password)
+        use_tls = yaml_cfg.get("use_tls", use_tls)
+        await mqtt_service.connect(host=host, port=port, user=user, password=password, use_tls=use_tls)
 
     yield
 
