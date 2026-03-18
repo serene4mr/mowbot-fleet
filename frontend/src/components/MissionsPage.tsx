@@ -9,6 +9,7 @@ import type { MissionRoute, Waypoint } from '../types/mission';
 // Satellite imagery basemap (no API key required).
 const SATELLITE_STYLE: maplibregl.StyleSpecification = {
   version: 8,
+  glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
   sources: {
     'esri-satellite': {
       type: 'raster',
@@ -21,12 +22,32 @@ const SATELLITE_STYLE: maplibregl.StyleSpecification = {
   },
   layers: [
     {
+      id: 'background',
+      type: 'background',
+      paint: { 'background-color': '#0b0e14' },
+    },
+    {
       id: 'esri-satellite-layer',
       type: 'raster',
       source: 'esri-satellite',
     },
   ],
 };
+
+const MOWBOT_ARROW_SELECTED_SVG =
+  '<svg width="34" height="34" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
+  '<defs>' +
+  '<filter id="glow" x="-50%" y="-50%" width="200%" height="200%">' +
+  '<feGaussianBlur stdDeviation="3" result="blur"/>' +
+  '<feColorMatrix in="blur" type="matrix" values="0 0 0 0 0  0 0 0 0 1  0 0 0 0 0.53  0 0 0 0.75 0" result="colored"/>' +
+  '<feMerge><feMergeNode in="colored"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+  '</filter>' +
+  '</defs>' +
+  '<path d="M50 5 L90 90 L50 70 L10 90 L50 5 Z" fill="#00ff88" stroke="rgba(255,255,255,0.95)" stroke-width="7" filter="url(#glow)"/>' +
+  '</svg>';
+
+// See `MapComponent.tsx` for the same convention.
+const HEADING_OFFSET_DEG = 180;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +80,10 @@ export default function MissionsPage() {
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
+
+  // Stable ref so the map init effect (which must run once) can always call
+  // the latest version of updateSelectedAgvSource without re-mounting the map.
+  const updateSelectedAgvSourceRef = useRef<() => void>(() => {});
 
   const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
   const [routes, setRoutes] = useState<MissionRoute[]>([]);
@@ -98,6 +123,36 @@ export default function MissionsPage() {
     pointSource?.setData(buildWaypointGeoJSON(nextWaypoints) as GeoJSON.FeatureCollection);
   }, []);
 
+  const updateSelectedAgvSource = useCallback(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+    const src = map.current.getSource('selected-agv') as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
+
+    const agv = selectedAgvSerial ? fleet[selectedAgvSerial] : undefined;
+    if (!agv) {
+      src.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+
+    const thetaDeg = ((((agv.theta * 180) / Math.PI) + HEADING_OFFSET_DEG) % 360 + 360) % 360;
+
+    src.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: agv.position },
+          properties: { serial: agv.serial, theta: thetaDeg },
+        },
+      ],
+    });
+  }, [fleet, selectedAgvSerial]);
+
+  // Keep the ref in sync with the latest callback (no map remount needed).
+  useEffect(() => {
+    updateSelectedAgvSourceRef.current = updateSelectedAgvSource;
+  }, [updateSelectedAgvSource]);
+
   // ── map initialisation ──────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -116,6 +171,53 @@ export default function MissionsPage() {
 
       map.current.on('load', () => {
         if (!map.current) return;
+
+        // Selected AGV marker (only one, driven by dropdown)
+        map.current.addSource('selected-agv', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+
+        const ensureSelectedLayer = () => {
+          if (!map.current) return;
+          if (map.current.getLayer('selected-agv-layer')) return;
+          if (!map.current.hasImage('mowbot-arrow-selected')) return;
+
+          map.current.addLayer({
+            id: 'selected-agv-layer',
+            type: 'symbol',
+            source: 'selected-agv',
+            layout: {
+              'icon-image': 'mowbot-arrow-selected',
+              'icon-rotate': ['get', 'theta'],
+              'icon-rotation-alignment': 'map',
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+              'icon-size': 1.2,
+              'text-field': ['get', 'serial'],
+              'text-offset': [0, 1.6],
+              'text-anchor': 'top',
+              'text-allow-overlap': true,
+              'text-ignore-placement': true,
+              'text-size': 12,
+            },
+            paint: { 'text-color': '#00ff88' },
+          });
+        };
+
+        if (!map.current.hasImage('mowbot-arrow-selected')) {
+          const imgSelected = new Image(34, 34);
+          imgSelected.onload = () => {
+            if (!map.current) return;
+            if (!map.current.hasImage('mowbot-arrow-selected')) {
+              map.current.addImage('mowbot-arrow-selected', imgSelected);
+            }
+            ensureSelectedLayer();
+          };
+          imgSelected.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(MOWBOT_ARROW_SELECTED_SVG)}`;
+        } else {
+          ensureSelectedLayer();
+        }
 
         // Line layer
         map.current.addSource('route-line', {
@@ -160,6 +262,8 @@ export default function MissionsPage() {
           },
           paint: { 'text-color': '#0e1117' },
         });
+
+        updateSelectedAgvSourceRef.current();
       });
 
       // Click to add waypoint
@@ -179,13 +283,19 @@ export default function MissionsPage() {
       map.current?.remove();
       map.current = null;
     };
-  }, [updateRouteSources]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── update map layers when waypoints change ─────────────────────────────────
 
   useEffect(() => {
     updateRouteSources(waypoints);
   }, [updateRouteSources, waypoints]);
+
+  useEffect(() => {
+    updateSelectedAgvSource();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fleet, selectedAgvSerial]);
 
   // ── save route ──────────────────────────────────────────────────────────────
 
