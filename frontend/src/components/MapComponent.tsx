@@ -29,6 +29,12 @@ const SATELLITE_STYLE: maplibregl.StyleSpecification = {
 const MOWBOT_ARROW_SVG =
   '<svg width="30" height="30" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M50 5 L90 90 L50 70 L10 90 L50 5 Z" fill="#00ff88" stroke="#ffffff" stroke-width="2"/></svg>';
 
+// Heading conventions vary by robot stack:
+// - MapLibre expects degrees where 0° points "north/up" and positive rotates clockwise.
+// - Some robotics stacks also use clockwise-positive; others use CCW-positive.
+// Adjust the sign/offset here to align frames.
+const HEADING_OFFSET_DEG = 90;
+
 function addFleetToMap(map: maplibregl.Map | null, setSelectedAgv: (s: string | null) => void) {
   if (!map?.getSource('fleet-source')) return;
 
@@ -70,8 +76,9 @@ function addFleetToMap(map: maplibregl.Map | null, setSelectedAgv: (s: string | 
 const MapComponent: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const { fleet, setSelectedAgv } = useFleetStore();
+  const { fleet, selectedAgv, setSelectedAgv } = useFleetStore();
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('satellite');
+  const hasAutoFit = useRef(false);
 
   // 1. Initialize Map (after layout so container has dimensions)
   useEffect(() => {
@@ -83,8 +90,9 @@ const MapComponent: React.FC = () => {
       map.current = new maplibregl.Map({
         container,
         style: SATELLITE_STYLE,
-        center: [128.39, 36.14],
-        zoom: 15,
+        // Start zoomed out so "world view" is visible immediately.
+        center: [0, 20],
+        zoom: 1.6,
       });
 
       map.current.on('load', () => {
@@ -118,6 +126,52 @@ const MapComponent: React.FC = () => {
     });
   }, [setSelectedAgv]);
 
+  // 2.5 Auto-fit: once telemetry arrives, fit camera to all robots
+  useEffect(() => {
+    if (!map.current || hasAutoFit.current) return;
+
+    const coords = Object.values(fleet)
+      .map((a) => a.position)
+      .filter(
+        (p): p is [number, number] =>
+          Array.isArray(p) &&
+          p.length >= 2 &&
+          Number.isFinite(p[0]) &&
+          Number.isFinite(p[1])
+      )
+      .map(([lng, lat]) => [lng, lat] as [number, number]);
+
+    if (coords.length === 0) return;
+
+    if (coords.length === 1) {
+      const [lng, lat] = coords[0];
+      map.current.flyTo({ center: [lng, lat], zoom: 16, duration: 900 });
+      hasAutoFit.current = true;
+      return;
+    }
+
+    const bounds = new maplibregl.LngLatBounds(coords[0], coords[0]);
+    for (const c of coords.slice(1)) bounds.extend(c);
+
+    map.current.fitBounds(bounds, {
+      padding: 80,
+      duration: 900,
+      // If robots are close together, don't zoom in too aggressively on first load.
+      maxZoom: 14,
+    });
+    hasAutoFit.current = true;
+  }, [fleet]);
+
+  // 2.6 Focus selected robot when selection changes (no zoom jump)
+  useEffect(() => {
+    if (!map.current || !selectedAgv) return;
+    const agv = fleet[selectedAgv];
+    if (!agv?.position || agv.position.length < 2) return;
+    const [lng, lat] = agv.position;
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+    map.current.easeTo({ center: [lng, lat], duration: 600 });
+  }, [fleet, selectedAgv]);
+
   // 3. Update AGV positions in real time
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded()) return;
@@ -133,7 +187,8 @@ const MapComponent: React.FC = () => {
       },
       properties: {
         serial: agv.serial,
-        theta: (agv.theta * 180) / Math.PI,
+        // Robot appears clockwise-positive, so do NOT invert sign.
+        theta: ((((agv.theta * 180) / Math.PI) + HEADING_OFFSET_DEG) % 360 + 360) % 360,
         battery: agv.battery,
       },
     }));

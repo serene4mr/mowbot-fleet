@@ -90,8 +90,16 @@ export default function Sidebar() {
                 {agv.battery}%
               </div>
             </div>
-            <div className="mt-2 text-[11px] text-white/40 font-mono">
-              {agv.position[0].toFixed(4)}, {agv.position[1].toFixed(4)}
+            <div
+              className="mt-2 text-[11px] text-white/40 font-mono leading-4"
+              title={`lon: ${agv.position[0]}\nlat: ${agv.position[1]}`}
+            >
+              <div className="truncate">
+                <span className="text-white/35">lon</span> {agv.position[0]}
+              </div>
+              <div className="truncate">
+                <span className="text-white/35">lat</span> {agv.position[1]}
+              </div>
             </div>
           </button>
         ))}
