@@ -5,6 +5,7 @@ import { WS_FLEET_URL } from './config';
 import MapComponent from './components/MapComponent';
 import Sidebar from './components/Sidebar';
 import FleetDetailPanel from './components/FleetDetailPanel';
+import MapOptionsPanel from './components/MapOptionsPanel';
 import SettingsPage from './components/SettingsPage';
 import MissionsPage from './components/MissionsPage';
 import LoginPage from './components/LoginPage';
@@ -48,14 +49,17 @@ function App() {
           {activePage === 'map' && (
             <div className="h-full w-full flex overflow-hidden">
               <aside className="w-96 bg-[#1a1c23] border-r border-gray-800 flex flex-col overflow-hidden shrink-0">
-                <div className="border-b border-gray-800 px-10 py-4 shrink-0">
-                  <div className="text-sm tracking-widest uppercase text-gray-400 font-semibold">
-                    Mowbot Detail &amp; Commands
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <MapOptionsPanel />
+                  <div className="border-t border-gray-800 px-10 py-4 shrink-0">
+                    <div className="text-sm tracking-widest uppercase text-gray-400 font-semibold">
+                      Mowbot Detail &amp; Commands
+                    </div>
                   </div>
-                </div>
-                <div className="flex-1 min-h-0 overflow-y-auto px-10 py-6">
-                  <div className="mx-auto w-full max-w-[18rem]">
-                    <FleetDetailPanel />
+                  <div className="px-10 pb-6">
+                    <div className="mx-auto w-full max-w-[18rem]">
+                      <FleetDetailPanel />
+                    </div>
                   </div>
                 </div>
               </aside>

@@ -1,9 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useFleetStore } from '../store/useFleetStore';
-
-const STREET_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
 // Free satellite imagery (no API key). Mapbox satellite can be used instead if you have a valid token.
 const SATELLITE_STYLE: maplibregl.StyleSpecification = {
@@ -198,10 +196,43 @@ function addFleetToMap(map: maplibregl.Map | null, onSelectAgv: (serial: string)
 const MapComponent: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const { fleet, selectedAgv, focusRequest, requestFocusAgv } = useFleetStore();
-  const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('satellite');
+  const { fleet, selectedAgv, focusRequest, requestFocusAgv, showOnlySelectedMowbot } = useFleetStore();
   const hasAutoFit = useRef(false);
   const fleetRef = useRef(fleet);
+  const selectedAgvRef = useRef(selectedAgv);
+  const showOnlySelectedRef = useRef(showOnlySelectedMowbot);
+
+  const buildFleetFeatures = useCallback((
+    f: typeof fleet,
+    onlySelected: boolean,
+    sel: string | null
+  ) => {
+    const all = Object.values(f);
+    const filtered = onlySelected && sel ? all.filter((a) => a.serial === sel) : all;
+
+    return filtered.map((agv) => ({
+      type: 'Feature' as const,
+      geometry: {
+        type: 'Point' as const,
+        coordinates: agv.position,
+      },
+      properties: {
+        serial: agv.serial,
+        theta: ((((agv.theta * 180) / Math.PI) + HEADING_OFFSET_DEG) % 360 + 360) % 360,
+        battery: agv.battery,
+        operating_mode: agv.operating_mode,
+        last_update: agv.last_update,
+      },
+    }));
+  }, []);
+
+  const syncFleetSourceNow = useCallback(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+    const source = map.current.getSource('fleet-source') as maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+    const features = buildFleetFeatures(fleetRef.current, showOnlySelectedRef.current, selectedAgvRef.current);
+    source.setData({ type: 'FeatureCollection', features });
+  }, [buildFleetFeatures]);
 
   // 1. Initialize Map (after layout so container has dimensions)
   useEffect(() => {
@@ -213,7 +244,6 @@ const MapComponent: React.FC = () => {
       map.current = new maplibregl.Map({
         container,
         style: SATELLITE_STYLE,
-        // Start zoomed out so "world view" is visible immediately.
         center: [0, 20],
         zoom: 1.6,
       });
@@ -224,6 +254,8 @@ const MapComponent: React.FC = () => {
         data: { type: 'FeatureCollection', features: [] },
       });
       addFleetToMap(map.current, requestFocusAgv);
+      // Ensure markers appear immediately (don’t wait for next telemetry tick)
+      syncFleetSourceNow();
       });
     };
 
@@ -232,22 +264,7 @@ const MapComponent: React.FC = () => {
       cancelAnimationFrame(rafId);
       map.current?.remove();
     };
-  }, [requestFocusAgv]);
-
-  // 2. Satellite / Street style toggle
-  const setStyle = useCallback((style: 'street' | 'satellite') => {
-    if (!map.current) return;
-    setMapStyle(style);
-    const url = style === 'satellite' ? SATELLITE_STYLE : STREET_STYLE;
-    map.current.setStyle(url);
-    map.current.once('load', () => {
-      map.current?.addSource('fleet-source', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
-      addFleetToMap(map.current, requestFocusAgv);
-    });
-  }, [requestFocusAgv]);
+  }, [requestFocusAgv, syncFleetSourceNow]);
 
   // 2.5 Auto-fit: once telemetry arrives, fit camera to all robots
   useEffect(() => {
@@ -290,6 +307,14 @@ const MapComponent: React.FC = () => {
     fleetRef.current = fleet;
   }, [fleet]);
 
+  useEffect(() => {
+    selectedAgvRef.current = selectedAgv;
+  }, [selectedAgv]);
+
+  useEffect(() => {
+    showOnlySelectedRef.current = showOnlySelectedMowbot;
+  }, [showOnlySelectedMowbot]);
+
   // 2.6 Focus is ONLY triggered by an explicit UI request (e.g. click in Active Robots list).
   useEffect(() => {
     if (!map.current || !focusRequest) return;
@@ -324,73 +349,17 @@ const MapComponent: React.FC = () => {
     const source = map.current.getSource('fleet-source') as maplibregl.GeoJSONSource;
     if (!source) return;
 
-    const features = Object.values(fleet).map((agv) => ({
-      type: 'Feature' as const,
-      geometry: {
-        type: 'Point' as const,
-        coordinates: agv.position,
-      },
-      properties: {
-        serial: agv.serial,
-        // Robot appears clockwise-positive, so do NOT invert sign.
-        theta: ((((agv.theta * 180) / Math.PI) + HEADING_OFFSET_DEG) % 360 + 360) % 360,
-        battery: agv.battery,
-        operating_mode: agv.operating_mode,
-        last_update: agv.last_update,
-      },
-    }));
+    const features = buildFleetFeatures(fleet, showOnlySelectedMowbot, selectedAgv);
 
     source.setData({ type: 'FeatureCollection', features });
-  }, [fleet]);
+  }, [buildFleetFeatures, fleet, selectedAgv, showOnlySelectedMowbot]);
 
   return (
-    /* 1. Main Wrapper: Must be 'relative' to anchor the buttons */
-    <div className="relative w-full h-full overflow-hidden">
-      
-      {/* 2. The Map: Absolute and z-0 to keep it in the background */}
-      <div
-        ref={mapContainer}
-        className="absolute inset-0 w-full h-full z-0"
-        style={{ minHeight: '400px' }}
-      />
-  
-      {/* 3. The Controls: Absolute, top-left, and a massive z-index */}
-      <div 
-        className="absolute top-6 left-6 flex flex-col gap-3 pointer-events-auto"
-        style={{ zIndex: 9999 }}
-      >
-        {/* Label */}
-        <div className="bg-black/35 px-3 py-2 rounded-xl shadow-2xl border border-white/10 backdrop-blur-md">
-          <p className="text-[#00ff88] font-black text-[10px] tracking-[0.22em] uppercase">
-            Telemetry
-          </p>
-        </div>
-  
-        {/* Style Switcher */}
-        <div className="flex bg-black/35 p-1 rounded-xl border border-white/10 shadow-2xl backdrop-blur-md">
-          <button
-            onClick={() => setStyle('street')}
-            className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
-              mapStyle === 'street' 
-              ? 'bg-[#00ff88] text-[#06120b]' 
-              : 'text-white/60 hover:text-white'
-            }`}
-          >
-            STREET
-          </button>
-          <button
-            onClick={() => setStyle('satellite')}
-            className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
-              mapStyle === 'satellite' 
-              ? 'bg-[#00ff88] text-[#06120b]' 
-              : 'text-white/60 hover:text-white'
-            }`}
-          >
-            SATELLITE
-          </button>
-        </div>
-      </div>
-    </div>
+    <div
+      ref={mapContainer}
+      className="w-full h-full"
+      style={{ minHeight: '400px' }}
+    />
   );
 };
 

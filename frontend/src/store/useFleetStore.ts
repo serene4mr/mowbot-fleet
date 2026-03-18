@@ -12,6 +12,7 @@ interface FleetState {
   // UI
   activePage: AppPage;
   language: 'en' | 'ko';
+  showOnlySelectedMowbot: boolean;
 
   // Actions
   updateFleet: (newFleet: FleetDict) => void;
@@ -20,6 +21,7 @@ interface FleetState {
   requestFocusAgv: (serial: string) => void;
   setActivePage: (page: AppPage) => void;
   setLanguage: (lang: 'en' | 'ko') => void;
+  setShowOnlySelectedMowbot: (val: boolean) => void;
 }
 
 const LS_LANGUAGE_KEY = 'mowbotfleet.language';
@@ -36,6 +38,7 @@ export const useFleetStore = create<FleetState>((set) => ({
   focusRequest: null,
   activePage: 'map',
   language: loadLanguage(),
+  showOnlySelectedMowbot: false,
 
   updateFleet: (newFleet) => set({ fleet: newFleet }),
   setConnected: (status) => set({ isConnected: status }),
@@ -50,4 +53,5 @@ export const useFleetStore = create<FleetState>((set) => ({
     localStorage.setItem(LS_LANGUAGE_KEY, lang);
     set({ language: lang });
   },
+  setShowOnlySelectedMowbot: (val) => set({ showOnlySelectedMowbot: val }),
 }));
