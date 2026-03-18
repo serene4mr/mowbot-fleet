@@ -29,9 +29,9 @@ export default function FleetDetailPanel() {
     return (
       <div>
         <div className="rounded-2xl border border-gray-800 bg-[#11131a] p-6">
-          <div className="text-sm tracking-widest uppercase text-gray-500 font-semibold">Robot</div>
+          <div className="text-sm tracking-widest uppercase text-gray-500 font-semibold">Mowbot</div>
           <div className="mt-2 text-base text-gray-300">
-            Select a robot from the list or click one on the map to see details and send commands.
+            Select a mowbot from the list or click one on the map to see details and send commands.
           </div>
         </div>
       </div>
@@ -74,7 +74,7 @@ export default function FleetDetailPanel() {
       <div className="rounded-2xl border border-gray-800 bg-[#11131a] p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-xs tracking-widest uppercase text-gray-500 font-semibold">Robot</div>
+            <div className="text-xs tracking-widest uppercase text-gray-500 font-semibold">Mowbot</div>
             <div className="mt-1 text-xl font-black tracking-tight truncate">{agv.serial}</div>
             <div className="mt-0.5 text-sm text-gray-400 truncate">
               {agv.manufacturer} · {agv.operating_mode}
