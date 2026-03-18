@@ -11,7 +11,6 @@ export default function MapOptionsPanel() {
 
       {/* Display filter */}
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-gray-400">Display</p>
         <label className="flex items-center gap-3 text-sm text-gray-200 select-none cursor-pointer">
           <input
             type="checkbox"
@@ -19,7 +18,7 @@ export default function MapOptionsPanel() {
             onChange={(e) => setShowOnlySelectedMowbot(e.target.checked)}
             className="h-4 w-4 rounded accent-[#00ff88]"
           />
-          Only selected mowbot
+          display only selected
         </label>
         {showOnlySelectedMowbot && !selectedAgv && (
           <p className="text-xs text-gray-500">Select a mowbot first.</p>
