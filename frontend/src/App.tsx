@@ -51,6 +51,7 @@ function App() {
               <aside className="w-96 bg-[#1a1c23] border-r border-gray-800 flex flex-col overflow-hidden shrink-0">
                 <div className="flex-1 min-h-0 overflow-y-auto">
                   <MapOptionsPanel />
+                  <div className="h-4" />
                   <div className="border-t border-gray-800 px-10 py-4 shrink-0">
                     <div className="text-sm tracking-widest uppercase text-gray-400 font-semibold">
                       Mowbot Detail &amp; Commands
