@@ -3,7 +3,6 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useFleetStore } from '../store/useFleetStore';
 
-const STREET_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 // Free satellite imagery (no API key). Mapbox satellite can be used instead if you have a valid token.
 const SATELLITE_STYLE: maplibregl.StyleSpecification = {
   version: 8,

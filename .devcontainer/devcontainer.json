@@ -1,5 +1,9 @@
 {
     "name": "mowbot-fleet-dev",
+    "runArgs": [
+        "--publish", "5174:5174",
+        "--publish", "8000:8000"
+    ],
     "build": {
         "dockerfile": "Dockerfile",
         "context": "..",
@@ -29,6 +33,7 @@
         // Bind Docker socket to allow Docker-in-Docker functionality
         "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
     ],
-    // Forward ports for the TS Web Dashboard (3000) and FastAPI Master Controller (8000)
-    "forwardPorts": [3000, 8000]
+    // Forward ports for the TS Web Dashboard (3000), FastAPI Master Controller (8000),
+    // and the Vite frontend dev server (5174).
+    "forwardPorts": [3000, 8000, 5174]
 }

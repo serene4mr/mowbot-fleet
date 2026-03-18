@@ -13,9 +13,20 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login({ username, password });
-    } catch {
-      setError('Invalid credentials. Please try again.');
+      await login({ username: username.trim(), password: password.trim() });
+    } catch (err: unknown) {
+      const errObj = err as {
+        response?: { data?: { detail?: unknown } };
+        message?: unknown;
+      };
+      const detail = errObj?.response?.data?.detail;
+      if (typeof detail === 'string' && detail.length > 0) {
+        setError(detail);
+      } else if (typeof errObj?.message === 'string' && errObj.message.length > 0) {
+        setError(errObj.message);
+      } else {
+        setError('Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

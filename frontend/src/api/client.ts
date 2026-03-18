@@ -1,10 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
-import { API_BASE_URL } from '../config';
 
-export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-});
+export const apiClient = axios.create({});
 
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;

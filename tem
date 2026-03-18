@@ -1,0 +1,15 @@
+# Install development tools for styling
+npm install -D tailwindcss postcss autoprefixer
+
+# Initialize Tailwind (This creates the tailwind.config.js file)
+npx tailwindcss init -p
+
+# Install the production libraries for your dashboard
+npm install lucide-react maplibre-gl zustand axios
+
+
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+npx wscat -c ws://0.0.0.0:8000/ws/fleet
+
+npm run dev
