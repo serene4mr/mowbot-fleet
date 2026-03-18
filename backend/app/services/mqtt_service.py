@@ -1,5 +1,7 @@
-import uuid
+import asyncio
 import logging
+import time
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple, Any
 
@@ -24,9 +26,17 @@ logger.setLevel(logging.INFO)
 # Global state dictionary: FastAPI will read this directly for WebSockets
 fleet_state: Dict[str, AGVInfo] = {}
 
+# Watchdog: if no state message for this many seconds while we have AGVs, force reconnect
+STALE_STATE_SECONDS = 15
+WATCHDOG_CHECK_INTERVAL = 5
+
+
 class MQTTService:
     def __init__(self):
         self._client: Optional[MasterControlClient] = None
+        self._last_state_received: Optional[float] = None
+        self._conn_params: Dict[str, Any] = {}
+        self._watchdog_task: Optional[asyncio.Task] = None
 
     def _parse_sensor_status(self, info_description: str) -> Dict[str, str]:
         """
@@ -49,6 +59,7 @@ class MQTTService:
         Callback: Triggered natively by vda5050_client when a State message arrives.
         Updates the fleet_state dictionary in RAM.
         """
+        self._last_state_received = time.monotonic()
         info = fleet_state.get(serial)
         if not info:
             # Create a new AGV entry if it doesn't exist
@@ -94,6 +105,7 @@ class MQTTService:
         """
         Initialize the MasterControlClient with correct positional arguments.
         """
+        self._conn_params = {"host": host, "port": port, "user": user, "password": password, "use_tls": use_tls}
         try:
             # Load general config for manufacturer and serial defaults
             from app.core.config import load_config
@@ -101,10 +113,11 @@ class MQTTService:
             gen_cfg = config.get("general", {})
             
             manufacturer = gen_cfg.get("manufacturer", "mowbot")
-            serial_number = gen_cfg.get("serial_number", "fleet-master")
-            client_id = f"fastapi_master_{uuid.uuid4().hex[:8]}"
+            base_serial = gen_cfg.get("serial_number", "fleet-master")
+            # Temporal workaround: unique serial per run so MQTT client_id (manufacturer_serial) is unique
+            serial_number = f"{base_serial}-{uuid.uuid4().hex[:8]}"
 
-            logger.info(f"Connecting to {host}:{port} as {client_id}")
+            logger.info(f"Connecting to {host}:{port} as {manufacturer}/{serial_number}")
             
             # --- FIX: Pass mandatory positional arguments first ---
             # Order: broker_url, manufacturer, serial_number
@@ -131,6 +144,8 @@ class MQTTService:
             # Connect asynchronously
             await self._client.connect()
             logger.info("✅ Successfully connected to MQTT Broker")
+            if self._watchdog_task is None or self._watchdog_task.done():
+                self._watchdog_task = asyncio.create_task(self._watchdog_loop())
             
         except Exception as e:
             logger.error(f"❌ Failed to connect to MQTT: {e}")
@@ -138,8 +153,39 @@ class MQTTService:
             logger.error(traceback.format_exc())
             self._client = None
 
+    async def _watchdog_loop(self) -> None:
+        """If no state message received for STALE_STATE_SECONDS while we have AGVs, reconnect once."""
+        while self._client is not None:
+            await asyncio.sleep(WATCHDOG_CHECK_INTERVAL)
+            if self._client is None:
+                return
+            if not self.is_connected():
+                continue
+            if len(fleet_state) == 0:
+                continue
+            if self._last_state_received is None:
+                continue
+            if time.monotonic() - self._last_state_received <= STALE_STATE_SECONDS:
+                continue
+            logger.warning(
+                "No state received for %ss (stale connection?), reconnecting MQTT...",
+                STALE_STATE_SECONDS,
+            )
+            self._last_state_received = time.monotonic()
+            await self.disconnect()
+            if self._conn_params:
+                await self.connect(**self._conn_params)
+            return
+
     async def disconnect(self):
         """Gracefully disconnect from the MQTT broker."""
+        if self._watchdog_task and not self._watchdog_task.done():
+            self._watchdog_task.cancel()
+            try:
+                await self._watchdog_task
+            except asyncio.CancelledError:
+                pass
+            self._watchdog_task = None
         if self._client:
             await self._client.disconnect()
             self._client = None

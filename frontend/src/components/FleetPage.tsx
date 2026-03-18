@@ -10,7 +10,7 @@ const INSTANT_ACTIONS = [
   { value: 'stopCharging', label: 'Stop Charging' },
 ] as const;
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-gray-800 bg-[#11131a] px-4 py-3">
       <div className="text-[10px] tracking-widest uppercase text-gray-500 font-semibold">{label}</div>
@@ -97,7 +97,19 @@ export default function FleetPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <Stat label="Last update" value={lastUpdate} />
           <Stat label="Current order" value={agv.current_order ?? '—'} />
-          <Stat label="Position" value={`${agv.position[0].toFixed(5)}, ${agv.position[1].toFixed(5)}`} />
+          <Stat
+            label="Position"
+            value={
+              <div className="font-mono text-[12px] leading-5 text-white/90" title={`lon: ${agv.position[0]}\nlat: ${agv.position[1]}`}>
+                <div>
+                  <span className="text-white/45">lon</span> {agv.position[0]}
+                </div>
+                <div>
+                  <span className="text-white/45">lat</span> {agv.position[1]}
+                </div>
+              </div>
+            }
+          />
           <Stat label="Heading (rad)" value={agv.theta.toFixed(3)} />
         </div>
 
