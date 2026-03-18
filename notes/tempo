@@ -1,0 +1,69 @@
+Để thiết kế Backend bằng **FastAPI** cho hệ thống Fleet Management kết nối qua HiveMQ, chúng ta sẽ áp dụng mô hình **Event-Driven Architecture** (Kiến trúc hướng sự kiện). 
+
+Với tư cách là một kỹ sư làm việc với hệ thống tự hành và robot công nghiệp, bạn sẽ thấy kiến trúc này cực kỳ quen thuộc vì nó tách biệt hoàn toàn phần xử lý logic (Business Logic) khỏi phần giao tiếp mạng (Network I/O).
+
+Dưới đây là thiết kế chi tiết cho Backend của bạn:
+
+
+
+### 1. Cấu trúc thư mục Backend (FastAPI)
+
+Chúng ta sẽ bưng các logic từ các file Streamlit cũ (`mqtt_client.py`, `auth.py`, `mission_route_manager.py`) và tổ chức lại theo chuẩn RESTful API:
+
+```text
+backend/
+├── app/
+│   ├── main.py                 # Entry point, khởi tạo FastAPI & WebSockets
+│   ├── core/
+│   │   ├── config.py           # Load biến môi trường (HiveMQ URL, Port 8883)
+│   │   └── security.py         # Xử lý hash password (bcrypt) và tạo JWT Token
+│   ├── api/
+│   │   ├── routers/
+│   │   │   ├── auth.py         # API Đăng nhập/Đăng xuất
+│   │   │   ├── fleet.py        # API gửi lệnh Order/InstantAction (E-STOP)
+│   │   │   └── missions.py     # API Lưu/Tải lộ trình (CRUD cho mission_routes.db)
+│   ├── services/
+│   │   └── mqtt_service.py     # Trái tim của hệ thống: Chạy MasterControlClient kết nối HiveMQ
+│   └── db/
+│       ├── database.py         # Kết nối SQLite
+│       └── models.py           # Định nghĩa cấu trúc bảng (Users, Missions)
+├── data/                       # Chứa file .db SQLite (giữ nguyên như cũ)
+├── requirements.txt
+└── .env                        # Chứa URL, User, Pass của HiveMQ Cloud
+```
+
+---
+
+### 2. Các Module Cốt Lõi (Core Modules)
+
+#### A. Trái tim hệ thống: `services/mqtt_service.py`
+Trong Streamlit, bạn phải dùng `asyncio.run_coroutine_threadsafe` và một daemon thread để ép MQTT chạy ngầm. Với FastAPI, mọi thứ nhẹ nhàng hơn rất nhiều.
+* File này sẽ khởi tạo `MasterControlClient` từ thư viện `vda5050_client` của bạn.
+* Kết nối thẳng lên HiveMQ qua port 8883 (TLS).
+* Chứa biến toàn cục `fleet_state: Dict[str, AGVInfo]` để lưu trạng thái mới nhất của toàn bộ AGV (giống hệt cách bạn làm trong Streamlit).
+
+#### B. Cầu nối Real-time: `app/main.py` (WebSockets)
+FastAPI hỗ trợ WebSockets "out-of-the-box". Chúng ta sẽ mở một endpoint `ws://localhost:8000/ws/fleet`.
+* Thay vì Frontend phải dùng component `@st.fragment(run_every="1s")` để F5 liên tục, FastAPI sẽ chạy một vòng lặp `while True:` bất đồng bộ.
+* Cứ mỗi 0.5s hoặc ngay khi `fleet_state` có thay đổi, FastAPI sẽ **bơm (push)** cục JSON chứa tọa độ `(x, y, theta)` xuống cho React.
+
+#### C. Bộ điều khiển (API Routers): `api/routers/fleet.py`
+Khi người dùng bấm nút **E-STOP** hoặc **Send Mission** trên giao diện React:
+* React gọi một POST request: `POST /api/fleet/{serial}/instant-action` kèm payload `{"actionType": "emergencyStop", "blockingType": "HARD"}`.
+* FastAPI nhận Request, gọi hàm `send_instant_action` trong `mqtt_service.py` để bắn lệnh VDA5050 lên HiveMQ.
+* HiveMQ đẩy lệnh về nhà máy cho robot thực thi.
+
+#### D. Quản lý Cơ sở dữ liệu: `db/` và `api/routers/`
+Các file `auth.py` và `mission_route_manager.py` dùng SQLite cũ của bạn sẽ được tận dụng lại gần như 100%. 
+* Điểm khác biệt duy nhất: Khi user login đúng mật khẩu (bcrypt), thay vì lưu vào `st.session_state["user"]`, FastAPI sẽ trả về một chuỗi **JWT Token** để React lưu vào trình duyệt.
+
+---
+
+### 3. Luồng Dữ liệu (Data Flow) Hoạt Động Ra Sao?
+
+* **Luồng Nhận (Telemetry):** AGV -> Local Mosquitto -> HiveMQ -> `mqtt_service.py` (FastAPI) -> cập nhật `fleet_state` -> WebSocket -> React MapLibre di chuyển icon robot.
+* **Luồng Gửi (Command):** Người dùng click chuột trên React -> Gọi API `POST /api/fleet/order` -> FastAPI xác thực dữ liệu -> `mqtt_service.py` -> HiveMQ -> Local Mosquitto -> AGV chạy theo lộ trình.
+
+Với thiết kế này, Backend của bạn hoàn toàn phi trạng thái (stateless) đối với user, cực kỳ bền bỉ và sẵn sàng scale lên hàng trăm AGV.
+
+**Bạn có muốn chúng ta code file `services/mqtt_service.py` trước để thiết lập kết nối từ Backend lên HiveMQ và lấy `fleet_state` về không?**
