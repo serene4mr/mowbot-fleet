@@ -227,8 +227,12 @@ class MQTTService:
                 actions=[action]
             )
             
-            # Publish using your library
-            success = await self._client.publish_instant_actions(instant_actions_msg)
+            # Publish using the vda5050 MasterControlClient API
+            success = await self._client.send_instant_action(
+                target_manufacturer=agv.manufacturer,
+                target_serial=serial,
+                action=instant_actions_msg,
+            )
             
             if success:
                 logger.info(f"✅ Sent instant action '{action_type}' to {serial}")
@@ -300,7 +304,11 @@ class MQTTService:
                 edges=edges,
             )
 
-            success = await self._client.publish_order(order)
+            success = await self._client.send_order(
+                target_manufacturer=agv.manufacturer,
+                target_serial=serial,
+                order=order,
+            )
             if success:
                 logger.info(f"✅ Order dispatched to {serial} ({len(waypoints)} waypoints)")
             else:

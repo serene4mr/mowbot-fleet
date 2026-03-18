@@ -6,7 +6,27 @@ import { useFleetStore } from '../store/useFleetStore';
 import { apiClient } from '../api/client';
 import type { MissionRoute, Waypoint } from '../types/mission';
 
-const STREET_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+// Satellite imagery basemap (no API key required).
+const SATELLITE_STYLE: maplibregl.StyleSpecification = {
+  version: 8,
+  sources: {
+    'esri-satellite': {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      attribution: '&copy; <a href="https://www.esri.com/">Esri</a>',
+    },
+  },
+  layers: [
+    {
+      id: 'esri-satellite-layer',
+      type: 'raster',
+      source: 'esri-satellite',
+    },
+  ],
+};
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +90,14 @@ export default function MissionsPage() {
     fetchRoutes();
   }, [fetchRoutes]);
 
+  const updateRouteSources = useCallback((nextWaypoints: Waypoint[]) => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+    const lineSource = map.current.getSource('route-line') as maplibregl.GeoJSONSource | undefined;
+    const pointSource = map.current.getSource('route-points') as maplibregl.GeoJSONSource | undefined;
+    lineSource?.setData(buildLineGeoJSON(nextWaypoints) as GeoJSON.Feature);
+    pointSource?.setData(buildWaypointGeoJSON(nextWaypoints) as GeoJSON.FeatureCollection);
+  }, []);
+
   // ── map initialisation ──────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -81,7 +109,7 @@ export default function MissionsPage() {
 
       map.current = new maplibregl.Map({
         container,
-        style: STREET_STYLE,
+        style: SATELLITE_STYLE,
         center: [128.39, 36.14],
         zoom: 15,
       });
@@ -137,7 +165,12 @@ export default function MissionsPage() {
       // Click to add waypoint
       map.current.on('click', (e) => {
         const wp: Waypoint = [e.lngLat.lng, e.lngLat.lat];
-        setWaypoints((prev) => [...prev, wp]);
+        setWaypoints((prev) => {
+          const next = [...prev, wp];
+          // Update map immediately (avoid waiting for React effect cycle)
+          updateRouteSources(next);
+          return next;
+        });
       });
     });
 
@@ -146,19 +179,13 @@ export default function MissionsPage() {
       map.current?.remove();
       map.current = null;
     };
-  }, []);
+  }, [updateRouteSources]);
 
   // ── update map layers when waypoints change ─────────────────────────────────
 
   useEffect(() => {
-    if (!map.current || !map.current.isStyleLoaded()) return;
-
-    const lineSource = map.current.getSource('route-line') as maplibregl.GeoJSONSource | undefined;
-    const pointSource = map.current.getSource('route-points') as maplibregl.GeoJSONSource | undefined;
-
-    lineSource?.setData(buildLineGeoJSON(waypoints) as GeoJSON.Feature);
-    pointSource?.setData(buildWaypointGeoJSON(waypoints) as GeoJSON.FeatureCollection);
-  }, [waypoints]);
+    updateRouteSources(waypoints);
+  }, [updateRouteSources, waypoints]);
 
   // ── save route ──────────────────────────────────────────────────────────────
 
