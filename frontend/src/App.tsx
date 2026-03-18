@@ -50,7 +50,7 @@ function App() {
               <aside className="w-96 bg-[#1a1c23] border-r border-gray-800 flex flex-col overflow-hidden shrink-0">
                 <div className="border-b border-gray-800 px-10 py-4 shrink-0">
                   <div className="text-sm tracking-widest uppercase text-gray-400 font-semibold">
-                    Robot details &amp; commands
+                    Mowbot Detail &amp; Commands
                   </div>
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto px-10 py-6">
