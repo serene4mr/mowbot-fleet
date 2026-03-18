@@ -1,0 +1,2 @@
+# VDA5050 client from specific repository
+git+https://github.com/zeki-aitech/vda5050_client.git
