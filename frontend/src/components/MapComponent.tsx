@@ -144,7 +144,7 @@ const MapComponent: React.FC = () => {
 
   return (
     /* 1. Main Wrapper: Must be 'relative' to anchor the buttons */
-    <div className="relative w-full h-full bg-[#0e1117] overflow-hidden border-2 border-red-500/20">
+    <div className="relative w-full h-full overflow-hidden">
       
       {/* 2. The Map: Absolute and z-0 to keep it in the background */}
       <div
@@ -159,20 +159,20 @@ const MapComponent: React.FC = () => {
         style={{ zIndex: 9999 }}
       >
         {/* Label */}
-        <div className="bg-[#1a1c23] px-3 py-2 rounded shadow-2xl border border-gray-700 backdrop-blur-md">
-          <p className="text-[#00ff88] font-black text-[10px] tracking-widest uppercase">
-            📡 Telemetry Live
+        <div className="bg-black/35 px-3 py-2 rounded-xl shadow-2xl border border-white/10 backdrop-blur-md">
+          <p className="text-[#00ff88] font-black text-[10px] tracking-[0.22em] uppercase">
+            Telemetry
           </p>
         </div>
   
         {/* Style Switcher */}
-        <div className="flex bg-[#1a1c23] p-1 rounded-lg border border-gray-700 shadow-2xl backdrop-blur-md">
+        <div className="flex bg-black/35 p-1 rounded-xl border border-white/10 shadow-2xl backdrop-blur-md">
           <button
             onClick={() => setStyle('street')}
             className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
               mapStyle === 'street' 
-              ? 'bg-[#00ff88] text-[#0e1117]' 
-              : 'text-gray-400 hover:text-white'
+              ? 'bg-[#00ff88] text-[#06120b]' 
+              : 'text-white/60 hover:text-white'
             }`}
           >
             STREET
@@ -181,8 +181,8 @@ const MapComponent: React.FC = () => {
             onClick={() => setStyle('satellite')}
             className={`px-4 py-2 rounded-md text-xs font-bold transition-all ${
               mapStyle === 'satellite' 
-              ? 'bg-[#00ff88] text-[#0e1117]' 
-              : 'text-gray-400 hover:text-white'
+              ? 'bg-[#00ff88] text-[#06120b]' 
+              : 'text-white/60 hover:text-white'
             }`}
           >
             SATELLITE

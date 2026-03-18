@@ -52,6 +52,4 @@ export const useWebSocket = (url: string) => {
       }
     };
   }, [url, updateFleet, setConnected, setSelectedAgv, selectedAgv]);
-
-  return socketRef.current;
 };
