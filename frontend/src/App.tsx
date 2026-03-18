@@ -1,43 +1,51 @@
-// src/App.tsx
-import React from 'react';
 import { useFleetStore } from './store/useFleetStore';
+import { useAuthStore } from './store/useAuthStore';
 import { useWebSocket } from './hooks/useWebSocket';
+import MapComponent from './components/MapComponent';
+import Sidebar from './components/Sidebar';
+import FleetPage from './components/FleetPage';
+import SettingsPage from './components/SettingsPage';
+import MissionsPage from './components/MissionsPage';
+import LoginPage from './components/LoginPage';
 
 function App() {
-  // 1. Start the connection (The Nervous System)
+  const token = useAuthStore((s) => s.token);
+  const { isConnected, activePage } = useFleetStore();
+
   useWebSocket('ws://localhost:8000/ws/fleet');
 
-  // 2. Read the data (The Brain)
-  const { fleet, isConnected } = useFleetStore();
+  if (!token) {
+    return <LoginPage />;
+  }
 
   return (
-    <div className="min-h-screen bg-[#0e1117] text-white p-8">
-      <header className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
-        <h1 className="text-2xl font-bold text-[#00ff88]">Mowbot Fleet Manager</h1>
-        <div className={`flex items-center gap-2 text-sm font-mono ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
-          <div className={`w-3 h-3 rounded-full animate-pulse ${isConnected ? 'bg-green-400' : 'bg-red-400'}`} />
-          {isConnected ? 'LIVE STREAMING' : 'DISCONNECTED'}
-        </div>
-      </header>
+    <div className="flex h-screen w-screen bg-[#0e1117] text-white overflow-hidden">
+      <Sidebar />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {Object.values(fleet).map((agv) => (
-          <div key={agv.serial} className="bg-[#262730] p-6 rounded-xl border border-gray-700 hover:border-[#00ff88] transition-colors">
-            <h2 className="text-xl font-bold mb-2">{agv.serial}</h2>
-            <div className="space-y-1 text-sm text-gray-400">
-              <p>Mode: <span className="text-white">{agv.operating_mode}</span></p>
-              <p>Battery: <span className={agv.battery > 20 ? 'text-[#00ff88]' : 'text-red-400'}>{agv.battery}%</span></p>
-              <p className="truncate">Lat: {agv.position[1].toFixed(5)}, Lon: {agv.position[0].toFixed(5)}</p>
-            </div>
+      <main className="flex-1 relative flex flex-col min-w-0">
+        <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#1a1c23]">
+          <h1 className="text-xl font-black tracking-tight text-[#00ff88]">
+            MOWBOT<span className="text-white">FLEET</span>
+          </h1>
+          <div
+            className={`flex items-center gap-2 text-[10px] font-mono ${isConnected ? 'text-green-400' : 'text-red-400'}`}
+            title={isConnected ? 'WebSocket connected' : 'WebSocket disconnected'}
+          >
+            <span
+              className={`w-2 h-2 rounded-full animate-pulse block ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}
+              aria-hidden
+            />
+            <span>{isConnected ? 'LIVE STREAMING' : 'DISCONNECTED'}</span>
           </div>
-        ))}
-      </div>
+        </header>
 
-      {Object.keys(fleet).length === 0 && isConnected && (
-        <div className="mt-20 text-center text-gray-500 italic">
-          Connected to backend. Waiting for HiveMQ telemetry...
+        <div className="flex-1 relative min-h-0">
+          {activePage === 'map' && <MapComponent />}
+          {activePage === 'fleet' && <FleetPage />}
+          {activePage === 'missions' && <MissionsPage />}
+          {activePage === 'settings' && <SettingsPage />}
         </div>
-      )}
+      </main>
     </div>
   );
 }

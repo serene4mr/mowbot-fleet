@@ -1,12 +1,19 @@
 import uuid
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Optional, Any
+from typing import Dict, List, Optional, Tuple, Any
 
 from vda5050.clients.master_control import MasterControlClient
 from vda5050.models.state import State
 from vda5050.models.instant_action import InstantActions
 from vda5050.models.base import Action, BlockingType
+
+try:
+    from vda5050.models.order import Order
+    from vda5050.models.base import Node, Edge, NodePosition
+    _ORDER_MODELS_AVAILABLE = True
+except ImportError:
+    _ORDER_MODELS_AVAILABLE = False
 
 # Assuming you migrated your AGVInfo and ErrorInfo to Pydantic models
 from app.models.fleet import AGVInfo, ErrorInfo
@@ -187,6 +194,77 @@ class MQTTService:
         except Exception as e:
             logger.error(f"❌ Error sending instant action to {serial}: {e}")
             return False
+
+    async def send_order(self, serial: str, waypoints: List[Tuple[float, float]]) -> bool:
+        """
+        Converts a waypoints list into a VDA5050 Order and publishes it to the AGV.
+        Each waypoint is (longitude, latitude).
+        """
+        if not self.is_connected():
+            logger.error("Cannot send order: Not connected to broker")
+            return False
+
+        agv = fleet_state.get(serial)
+        if not agv:
+            logger.error(f"Cannot send order: AGV {serial} not found in fleet_state")
+            return False
+
+        if not _ORDER_MODELS_AVAILABLE:
+            logger.error("VDA5050 Order models not available in this library version")
+            return False
+
+        try:
+            nodes = []
+            edges = []
+            order_id = str(uuid.uuid4())
+
+            for i, (lon, lat) in enumerate(waypoints):
+                node_id = f"n{i}_{order_id[:6]}"
+                nodes.append(
+                    Node(
+                        nodeId=node_id,
+                        sequenceId=i * 2,
+                        released=True,
+                        nodePosition=NodePosition(x=lon, y=lat, mapId="default"),
+                        actions=[],
+                    )
+                )
+
+            for i in range(len(nodes) - 1):
+                edges.append(
+                    Edge(
+                        edgeId=f"e{i}_{order_id[:6]}",
+                        sequenceId=i * 2 + 1,
+                        startNodeId=nodes[i].nodeId,
+                        endNodeId=nodes[i + 1].nodeId,
+                        released=True,
+                        actions=[],
+                    )
+                )
+
+            order = Order(
+                headerId=1,
+                timestamp=datetime.now(timezone.utc),
+                version="2.1.0",
+                manufacturer=agv.manufacturer,
+                serialNumber=serial,
+                orderId=order_id,
+                orderUpdateId=0,
+                nodes=nodes,
+                edges=edges,
+            )
+
+            success = await self._client.publish_order(order)
+            if success:
+                logger.info(f"✅ Order dispatched to {serial} ({len(waypoints)} waypoints)")
+            else:
+                logger.error(f"❌ Failed to dispatch order to {serial}")
+            return success
+
+        except Exception as e:
+            logger.error(f"❌ Error dispatching order to {serial}: {e}")
+            return False
+
 
 # Export a singleton instance to be used by FastAPI routers
 mqtt_service = MQTTService()
