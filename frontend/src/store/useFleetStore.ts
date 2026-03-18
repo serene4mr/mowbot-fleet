@@ -7,6 +7,7 @@ interface FleetState {
   fleet: FleetDict;
   isConnected: boolean;
   selectedAgv: string | null;
+  focusRequest: { serial: string; nonce: number } | null;
 
   // UI
   activePage: AppPage;
@@ -16,6 +17,7 @@ interface FleetState {
   updateFleet: (newFleet: FleetDict) => void;
   setConnected: (status: boolean) => void;
   setSelectedAgv: (serial: string | null) => void;
+  requestFocusAgv: (serial: string) => void;
   setActivePage: (page: AppPage) => void;
   setLanguage: (lang: 'en' | 'ko') => void;
 }
@@ -31,12 +33,18 @@ export const useFleetStore = create<FleetState>((set) => ({
   fleet: {},
   isConnected: false,
   selectedAgv: null,
+  focusRequest: null,
   activePage: 'map',
   language: loadLanguage(),
 
   updateFleet: (newFleet) => set({ fleet: newFleet }),
   setConnected: (status) => set({ isConnected: status }),
   setSelectedAgv: (serial) => set({ selectedAgv: serial }),
+  requestFocusAgv: (serial) =>
+    set((s) => ({
+      selectedAgv: serial,
+      focusRequest: { serial, nonce: (s.focusRequest?.nonce ?? 0) + 1 },
+    })),
   setActivePage: (page) => set({ activePage: page }),
   setLanguage: (lang) => {
     localStorage.setItem(LS_LANGUAGE_KEY, lang);
