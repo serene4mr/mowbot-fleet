@@ -33,7 +33,7 @@ const MOWBOT_ARROW_SVG =
 // - MapLibre expects degrees where 0° points "north/up" and positive rotates clockwise.
 // - Some robotics stacks also use clockwise-positive; others use CCW-positive.
 // Adjust the sign/offset here to align frames.
-const HEADING_OFFSET_DEG = 90;
+const HEADING_OFFSET_DEG = 180;
 
 function addFleetToMap(map: maplibregl.Map | null, setSelectedAgv: (s: string | null) => void) {
   if (!map?.getSource('fleet-source')) return;
