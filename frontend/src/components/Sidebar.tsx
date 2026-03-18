@@ -54,53 +54,54 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {(activePage === 'fleet' || activePage === 'map') && (
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          <div className="text-xs tracking-[0.22em] uppercase text-white/55 font-semibold px-1">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div className="text-xs tracking-[0.22em] uppercase text-white/55 font-semibold">
             Active Robots
           </div>
-
-          {Object.values(fleet).map((agv) => (
-            <button
-              key={agv.serial}
-              type="button"
-              onClick={() => setSelectedAgv(agv.serial)}
-              className={`w-full text-left p-4 rounded-2xl border transition-colors ${
-                selectedAgv === agv.serial
-                  ? 'border-[#00ff88]/55 bg-[#00ff88]/10 shadow-[0_0_0_1px_rgba(0,255,136,0.18)]'
-                  : 'border-white/10 bg-white/5 hover:bg-white/8'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-black text-[15px] tracking-tight truncate text-white/90">
-                    {agv.serial}
-                  </div>
-                  <div className="text-[12px] text-white/50 truncate">
-                    Mode: <span className="text-white/70">{agv.operating_mode}</span>
-                  </div>
-                </div>
-                <div
-                  className={`text-sm font-bold shrink-0 ${
-                    agv.battery > 20 ? 'text-[#00ff88]' : 'text-red-300'
-                  }`}
-                >
-                  {agv.battery}%
-                </div>
-              </div>
-              <div className="mt-2 text-[11px] text-white/40 font-mono">
-                {agv.position[0].toFixed(4)}, {agv.position[1].toFixed(4)}
-              </div>
-            </button>
-          ))}
-
-          {Object.keys(fleet).length === 0 && (
-            <div className="text-xs text-white/40 italic px-1">
-              {isConnected ? 'Connected. Waiting for telemetry…' : 'Waiting for backend WebSocket…'}
-            </div>
-          )}
+          <div className="text-[11px] text-white/35 font-mono">{Object.keys(fleet).length}</div>
         </div>
-      )}
+
+        {Object.values(fleet).map((agv) => (
+          <button
+            key={agv.serial}
+            type="button"
+            onClick={() => setSelectedAgv(agv.serial)}
+            className={`w-full text-left p-4 rounded-2xl border transition-colors ${
+              selectedAgv === agv.serial
+                ? 'border-[#00ff88]/55 bg-[#00ff88]/10 shadow-[0_0_0_1px_rgba(0,255,136,0.18)]'
+                : 'border-white/10 bg-white/5 hover:bg-white/8'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-black text-[15px] tracking-tight truncate text-white/90">
+                  {agv.serial}
+                </div>
+                <div className="text-[12px] text-white/50 truncate">
+                  Mode: <span className="text-white/70">{agv.operating_mode}</span>
+                </div>
+              </div>
+              <div
+                className={`text-sm font-bold shrink-0 ${
+                  agv.battery > 20 ? 'text-[#00ff88]' : 'text-red-300'
+                }`}
+              >
+                {agv.battery}%
+              </div>
+            </div>
+            <div className="mt-2 text-[11px] text-white/40 font-mono">
+              {agv.position[0].toFixed(4)}, {agv.position[1].toFixed(4)}
+            </div>
+          </button>
+        ))}
+
+        {Object.keys(fleet).length === 0 && (
+          <div className="text-xs text-white/40 italic px-1">
+            {isConnected ? 'Connected. Waiting for telemetry…' : 'Waiting for backend WebSocket…'}
+          </div>
+        )}
+      </div>
     </aside>
   );
 }
