@@ -36,7 +36,7 @@ const MOWBOT_ARROW_SVG =
 // Adjust the sign/offset here to align frames.
 const HEADING_OFFSET_DEG = 180;
 
-function addFleetToMap(map: maplibregl.Map | null, setSelectedAgv: (s: string | null) => void) {
+function addFleetToMap(map: maplibregl.Map | null, onSelectAgv: (serial: string) => void) {
   if (!map?.getSource('fleet-source')) return;
 
   const img = new Image(30, 30);
@@ -64,11 +64,73 @@ function addFleetToMap(map: maplibregl.Map | null, setSelectedAgv: (s: string | 
       },
     });
 
+    const popup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      maxWidth: '340px',
+      offset: 18,
+      className: 'mowbot-popup',
+    });
+
     map.on('click', 'fleet-layer', (e) => {
       if (e.features?.[0]) {
         const serial = e.features[0].properties?.serial;
-        setSelectedAgv(serial ?? null);
+        if (typeof serial === 'string' && serial.length > 0) onSelectAgv(serial);
       }
+    });
+
+    // Make it feel clickable
+    map.on('mouseenter', 'fleet-layer', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', 'fleet-layer', () => {
+      map.getCanvas().style.cursor = '';
+      popup.remove();
+    });
+
+    map.on('mousemove', 'fleet-layer', (e) => {
+      const f = e.features?.[0];
+      if (!f || !f.geometry || f.geometry.type !== 'Point') return;
+      const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+      const p = f.properties ?? {};
+      const serial = String(p.serial ?? '');
+      const mode = String(p.operating_mode ?? '—');
+      const battery = typeof p.battery === 'number' ? p.battery : Number(p.battery);
+      const lastUpdate = String(p.last_update ?? '');
+
+      const batteryText = Number.isFinite(battery) ? `${battery.toFixed(0)}%` : '—';
+      popup
+        .setLngLat(coords)
+        .setHTML(
+          `<div style="
+            background: rgba(6, 10, 16, 0.86);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 22px;
+            padding: 16px 18px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+            color: rgba(255,255,255,0.96);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+          ">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+              <div style="font-weight:900; letter-spacing:-0.02em; font-size:18px; line-height:24px;">${serial}</div>
+              <div style="color: ${Number.isFinite(battery) && battery > 20 ? '#00ff88' : '#ff6b6b'}; font-weight:900; font-size:18px; line-height:24px;">${batteryText}</div>
+            </div>
+            <div style="margin-top:12px; font-size:16px; color: rgba(255,255,255,0.78); display:flex; gap:12px; align-items:baseline;">
+              <span style="color: rgba(255,255,255,0.55); text-transform:uppercase; letter-spacing:0.18em; font-size:13px; line-height:22px;">mode</span>
+              <span style="color: rgba(255,255,255,0.92); font-weight:800; line-height:22px;">${mode}</span>
+            </div>
+            ${
+              lastUpdate
+                ? `<div style="margin-top:8px; font-size:14px; color: rgba(255,255,255,0.62); display:flex; gap:10px;">
+                     <span style="color: rgba(255,255,255,0.45); text-transform:uppercase; letter-spacing:0.18em; font-size:13px; line-height:22px;">update</span>
+                     <span style="color: rgba(255,255,255,0.80); line-height:22px;">${lastUpdate}</span>
+                   </div>`
+                : ''
+            }
+          </div>`
+        )
+        .addTo(map);
     });
   };
   img.src = 'data:image/svg+xml;base64,' + btoa(MOWBOT_ARROW_SVG);
@@ -77,9 +139,10 @@ function addFleetToMap(map: maplibregl.Map | null, setSelectedAgv: (s: string | 
 const MapComponent: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
-  const { fleet, selectedAgv, setSelectedAgv } = useFleetStore();
+  const { fleet, focusRequest, requestFocusAgv } = useFleetStore();
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('satellite');
   const hasAutoFit = useRef(false);
+  const fleetRef = useRef(fleet);
 
   // 1. Initialize Map (after layout so container has dimensions)
   useEffect(() => {
@@ -101,7 +164,7 @@ const MapComponent: React.FC = () => {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       });
-      addFleetToMap(map.current, setSelectedAgv);
+      addFleetToMap(map.current, requestFocusAgv);
       });
     };
 
@@ -110,7 +173,7 @@ const MapComponent: React.FC = () => {
       cancelAnimationFrame(rafId);
       map.current?.remove();
     };
-  }, [setSelectedAgv]);
+  }, [requestFocusAgv]);
 
   // 2. Satellite / Street style toggle
   const setStyle = useCallback((style: 'street' | 'satellite') => {
@@ -123,9 +186,9 @@ const MapComponent: React.FC = () => {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       });
-      addFleetToMap(map.current, setSelectedAgv);
+      addFleetToMap(map.current, requestFocusAgv);
     });
-  }, [setSelectedAgv]);
+  }, [requestFocusAgv]);
 
   // 2.5 Auto-fit: once telemetry arrives, fit camera to all robots
   useEffect(() => {
@@ -163,15 +226,26 @@ const MapComponent: React.FC = () => {
     hasAutoFit.current = true;
   }, [fleet]);
 
-  // 2.6 Focus selected robot when selection changes (no zoom jump)
+  // Keep latest fleet in a ref so focusing doesn't re-run on every telemetry update.
   useEffect(() => {
-    if (!map.current || !selectedAgv) return;
-    const agv = fleet[selectedAgv];
+    fleetRef.current = fleet;
+  }, [fleet]);
+
+  // 2.6 Focus is ONLY triggered by an explicit UI request (e.g. click in Active Robots list).
+  useEffect(() => {
+    if (!map.current || !focusRequest) return;
+    const agv = fleetRef.current[focusRequest.serial];
     if (!agv?.position || agv.position.length < 2) return;
     const [lng, lat] = agv.position;
     if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
-    map.current.easeTo({ center: [lng, lat], duration: 600 });
-  }, [fleet, selectedAgv]);
+    const targetZoom = 16;
+    map.current.flyTo({
+      center: [lng, lat],
+      zoom: Math.max(map.current.getZoom(), targetZoom),
+      duration: 800,
+      essential: true,
+    });
+  }, [focusRequest]);
 
   // 3. Update AGV positions in real time
   useEffect(() => {
@@ -191,6 +265,8 @@ const MapComponent: React.FC = () => {
         // Robot appears clockwise-positive, so do NOT invert sign.
         theta: ((((agv.theta * 180) / Math.PI) + HEADING_OFFSET_DEG) % 360 + 360) % 360,
         battery: agv.battery,
+        operating_mode: agv.operating_mode,
+        last_update: agv.last_update,
       },
     }));
 

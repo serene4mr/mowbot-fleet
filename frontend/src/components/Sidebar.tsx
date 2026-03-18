@@ -2,7 +2,7 @@ import { Cpu, Map, Route, Settings } from 'lucide-react';
 import { useFleetStore } from '../store/useFleetStore';
 
 export default function Sidebar() {
-  const { fleet, selectedAgv, setSelectedAgv, isConnected, activePage, setActivePage } =
+  const { fleet, selectedAgv, requestFocusAgv, isConnected, activePage, setActivePage } =
     useFleetStore();
 
   const nav = [
@@ -66,7 +66,7 @@ export default function Sidebar() {
           <button
             key={agv.serial}
             type="button"
-            onClick={() => setSelectedAgv(agv.serial)}
+            onClick={() => requestFocusAgv(agv.serial)}
             className={`w-full text-left p-4 rounded-2xl border transition-colors ${
               selectedAgv === agv.serial
                 ? 'border-[#00ff88]/55 bg-[#00ff88]/10 shadow-[0_0_0_1px_rgba(0,255,136,0.18)]'
