@@ -6,8 +6,6 @@ const INSTANT_ACTIONS = [
   { value: 'startPause', label: 'Pause' },
   { value: 'stopPause', label: 'Resume' },
   { value: 'cancelOrder', label: 'Cancel Order' },
-  { value: 'startCharging', label: 'Start Charging' },
-  { value: 'stopCharging', label: 'Stop Charging' },
 ] as const;
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
